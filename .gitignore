@@ -1,5 +1,8 @@
 __pycache__
+.ipynb_checkpoints
 .pytest_cache
 data/
 *.egg-info/
 *.pt
+results/
+saved_states/
