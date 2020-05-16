@@ -11,8 +11,6 @@ from PIL import Image
 import numpy as np
 import torch
 
-IMAGE_SIZE = 256
-
 
 class SwipeCropper(object):
     
@@ -22,9 +20,12 @@ class SwipeCropper(object):
         self.hr = hr
         
     def __iter__(self):
+        return self
+        
+    def tiles(self):
         wr = self.wr
         hr = self.hr
-        c, h, w = image.shape
+        w, h, c = self.image.shape
         if (h < hr) or (w < wr):
             print("Image too small.")
             return
@@ -36,29 +37,33 @@ class SwipeCropper(object):
                 w0 = int((wn * wr) - (wn * wd))
                 h1 = int(h0 + hr)
                 w1 = int(w0 + wr)
-                yield(image[:, h0:h1, w0:w1])
+                yield(self.image[w0:w1, h0:h1, :])
 
-                
-def load_tiled_images(dir_path, width, height):
+    
+def load_tiled_images(dir_path, batch_size=8, width=128, height=128):
+    images = load_single_images_uncropped(dir_path)
+    batch = []
     while True:
-        with os.scandir(dir_path) as listing:
-            for entry in listing:
-                if not (entry.name.endswith('.png') or entry.name.endswith('.jpg')):
-                    continue
+        try:
+            image = next(images)
+            cropper = SwipeCropper(np.array(image), width, height)
+            tiles = cropper.tiles()
+            while True:
                 try:
-                    img = Image.open(entry.path)
-                except OSError:
-                    # Ignore corrupt images.
-                    continue
-                cropper = SwipeCropper(img, width, height)
-                while true:
-                    cropped_image = next(cropper)
-                    if cropped_image:
-                        yield cropped_image
-                    else:
-                        continue
+                    tile = next(tiles)
+                    batch.append(tile)
+                    if len(batch) == batch_size:
+                        batch = np.array(batch)
+                        batch = torch.from_numpy(batch).permute(0, 3, 1, 2).contiguous()
+                        batch = batch.float() / 255
+                        yield batch
+                        batch = []
+                except StopIteration:
+                    break
+        except StopIteration:
+            continue
 
-                
+                        
 def load_images(dir_path, batch_size=16):
     images = load_single_images(dir_path)
     while True:
@@ -87,3 +92,19 @@ def load_single_images(dir_path):
                 row = random.randrange(tensor.shape[0] - IMAGE_SIZE + 1)
                 col = random.randrange(tensor.shape[1] - IMAGE_SIZE + 1)
                 yield tensor[row:row + IMAGE_SIZE, col:col + IMAGE_SIZE]
+
+def load_single_images_uncropped(dir_path):
+    while True:
+        with os.scandir(dir_path) as listing:
+            for entry in listing:
+                if not (entry.name.endswith('.png') or entry.name.endswith('.jpg')):
+                    continue
+                try:
+                    img = Image.open(entry.path)
+                except OSError:
+                    # Ignore corrupt images.
+                    continue
+                img = img.convert('RGB')
+                tensor = np.array(img)
+                yield tensor
+
