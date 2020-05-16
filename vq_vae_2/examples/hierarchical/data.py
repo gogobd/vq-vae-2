@@ -93,18 +93,21 @@ def load_single_images(dir_path):
                 col = random.randrange(tensor.shape[1] - IMAGE_SIZE + 1)
                 yield tensor[row:row + IMAGE_SIZE, col:col + IMAGE_SIZE]
 
-def load_single_images_uncropped(dir_path):
+                
+def load_single_images_uncropped(dir_path, randomized=True):
     while True:
-        with os.scandir(dir_path) as listing:
-            for entry in listing:
-                if not (entry.name.endswith('.png') or entry.name.endswith('.jpg')):
-                    continue
-                try:
-                    img = Image.open(entry.path)
-                except OSError:
-                    # Ignore corrupt images.
-                    continue
-                img = img.convert('RGB')
-                tensor = np.array(img)
-                yield tensor
+        listing = list(os.scandir(dir_path))
+        if randomized:
+            random.shuffle(list(listing))
+        for entry in listing:
+            if not os.path.splitext(entry.name)[1].lower() in Image.registered_extensions().keys():
+                continue
+            try:
+                img = Image.open(entry.path)
+            except OSError:
+                # Ignore corrupt images.
+                continue
+            img = img.convert('RGB')
+            tensor = np.array(img)
+            yield tensor
 
