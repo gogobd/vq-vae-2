@@ -29,6 +29,9 @@ class SwipeCropper(object):
         if (h < hr) or (w < wr):
             print("Image too small.")
             return
+        if wr == w and hr == h:
+            yield self.image
+            return
         hd = (hr - (h % hr)) / ( h // hr )
         wd = (wr - (w % wr)) / ( w // wr )
         for hn in range(h//hr + 1):
